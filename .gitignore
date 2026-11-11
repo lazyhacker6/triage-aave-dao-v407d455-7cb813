@@ -1,0 +1,20 @@
+# build and cache
+cache/
+out/
+
+# general
+.env
+
+# editors
+.idea
+.vscode
+
+# Vs code spelling extension
+cspell.json
+
+# well, looks strange to ignore package-lock, but we have only prettier and it's temporary
+yarn.lock
+node_modules
+
+# ignore foundry deploy artifacts
+broadcast/

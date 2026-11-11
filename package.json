@@ -1,0 +1,36 @@
+{
+  "name": "@aave-dao/aave-umbrella",
+  "version": "1.0.0",
+  "scripts": {
+    "lint": "prettier ./",
+    "lint:fix": "npm run lint -- --write",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "changeset publish"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aave-dao/aave-umbrella.git"
+  },
+  "files": [
+    "src"
+  ],
+  "keywords": [],
+  "author": "BGD Labs for Aave",
+  "license": "BUSL1.1",
+  "bugs": {
+    "url": "https://github.com/aave-dao/aave-umbrella/issues"
+  },
+  "homepage": "https://github.com/aave-dao/aave-umbrella#readme",
+  "devDependencies": {
+    "@changesets/cli": "^2.28.1",
+    "prettier": "2.8.7",
+    "prettier-plugin-solidity": "1.1.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
