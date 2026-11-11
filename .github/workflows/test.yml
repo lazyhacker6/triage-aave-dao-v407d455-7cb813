@@ -1,19 +1,19 @@
 name: Test
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 on:
   pull_request:
-  push:
-    branches:
-      - main
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
-  test:
-    uses: bgd-labs/github-workflows/.github/workflows/foundry-test.yml@main
+  produce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Produce content
+        run: bash scripts/stage.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: content
+          path: content
